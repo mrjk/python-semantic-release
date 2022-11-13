@@ -53,7 +53,7 @@ def _config_from_source(source):
     if isinstance(source, list):
         parser.read(source)
     elif isinstance(source, dict):
-        parser.read_dict( { 'semantic_release': source } )
+        parser.read_dict({"semantic_release": source})
     else:
         raise Exception(f"Can't parse configuration source: {source}")
 
