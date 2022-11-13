@@ -16,6 +16,22 @@ from .errors import ImproperConfigurationError
 
 logger = logging.getLogger(__name__)
 
+FLAGS = {
+    "changelog_capitalize",
+    "changelog_scope",
+    "use_textual_changelog_sections",
+    "check_build_status",
+    "commit_version_number",
+    "ignore_token_for_push",
+    "patch_without_tag",
+    "major_on_zero",
+    "remove_dist",
+    "upload_to_pypi",
+    "upload_to_repository",
+    "upload_to_release",
+    "tag_commit",
+}
+
 
 def _config():
     cwd = getcwd()
@@ -23,7 +39,7 @@ def _config():
         os.path.join(os.path.dirname(__file__), "defaults.cfg"),
         os.path.join(cwd, "setup.cfg"),
     ]
-    ini_config = _config_from_ini(ini_paths)
+    ini_config = _config_from_source(ini_paths)
 
     toml_path = os.path.join(cwd, "pyproject.toml")
     toml_config = _config_from_pyproject(toml_path)
@@ -32,32 +48,21 @@ def _config():
     return UserDict({**ini_config, **toml_config})
 
 
-def _config_from_ini(paths):
+def _config_from_source(source):
     parser = configparser.ConfigParser()
-    parser.read(paths)
-
-    flags = {
-        "changelog_capitalize",
-        "changelog_scope",
-        "use_textual_changelog_sections",
-        "check_build_status",
-        "commit_version_number",
-        "ignore_token_for_push",
-        "patch_without_tag",
-        "major_on_zero",
-        "remove_dist",
-        "upload_to_pypi",
-        "upload_to_repository",
-        "upload_to_release",
-        "tag_commit",
-    }
+    if isinstance(source, list):
+        parser.read(source)
+    elif isinstance(source, dict):
+        parser.read_dict( { 'semantic_release': source } )
+    else:
+        raise Exception(f"Can't parse configuration source: {source}")
 
     # Iterate through the sections so that default values are applied
     # correctly.  See:
     # https://stackoverflow.com/questions/1773793/convert-configparser-items-to-dictionary
     config = {}
     for key, _ in parser.items("semantic_release"):
-        if key in flags:
+        if key in FLAGS:
             config[key] = parser.getboolean("semantic_release", key)
         else:
             config[key] = parser.get("semantic_release", key)
@@ -130,10 +135,16 @@ def overload_configuration(func):
     @wraps(func)
     def wrap(*args, **kwargs):
         if "define" in kwargs:
+
+            _config = {}
             for defined_param in kwargs["define"]:
                 pair = defined_param.split("=", maxsplit=1)
                 if len(pair) == 2:
-                    config[str(pair[0])] = pair[1]
+                    _config[str(pair[0])] = pair[1]
+
+            _config = _config_from_source(_config)
+            config.update(_config)
+
         return func(*args, **kwargs)
 
     return wrap
